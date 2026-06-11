@@ -408,13 +408,13 @@ sizeGame();
 const MESSAGES = [
   // Level 1
   "You messaged me first",
-  "I messaged you again after you ghosted me 🙄",
+  "I messaged you again after you ghosted me",
   // Level 2
   "We made it official too quick probably but I wouldn't change a thing 💞",
   "We met for the first time in the metro :))",
   // Level 3
   "We somehow make long distance work 🌍",
-  "We had our first anniversary :), I was the happiest I'd ever been and still am 💞",
+  "We had our first anniversary :), I was the happiest I'd ever been and still am ",
   // Level 4
   "We worked hard and achieved our goals even though we were committed to each other the whole time :)",
   "We went on our actual first date in Dubai Mall :)))",
@@ -1028,6 +1028,16 @@ function animate() {
   player.position.y += pState.vel.y * dt;
   player.position.z += pState.vel.z * dt;
 
+  // Move with platform BEFORE collision checks 
+  if ( 
+    standingPlatform &&
+    standingPlatform.moving &&
+    pState.onGround 
+  ){ 
+    player.position.x += standingPlatform.deltaX || 0; 
+    player.position.z += standingPlatform.deltaZ || 0; 
+  }
+
   // ── Collision ───────────────────────────────────────
   pState.onGround = false;
   standingPlatform = null;
@@ -1074,11 +1084,6 @@ function animate() {
       }
     }
   });
-
-  if (standingPlatform && standingPlatform.moving) {
-    player.position.x += standingPlatform.deltaX || 0;
-    player.position.z += standingPlatform.deltaZ || 0;
-  }
 
   // ── Death / respawn ─────────────────────────────────
   if (player.position.y < DEATH_Y) {
