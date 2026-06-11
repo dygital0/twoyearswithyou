@@ -327,6 +327,31 @@ canvas { display:block; width:100%!important; height:100%!important; }
   text-align: center;
 }
 #level-transition.active #lt-text { opacity: 1; }
+
+
+/* Joystick */
+.joystick{
+  width:220px;height:220px;position:relative;touch-action:none;
+}
+.joy-base{
+  position:absolute;left:50%;top:50%;
+  width:170px;height:170px;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:rgba(255,170,220,.10);
+  border:2px solid rgba(255,170,220,.25);
+}
+.joy-stick{
+  position:absolute;
+  left:50%;top:50%;
+  width:80px;height:80px;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:rgba(255,130,200,.35);
+  border:2px solid rgba(255,180,230,.7);
+  box-shadow:0 0 20px rgba(255,80,180,.35);
+}
+
 </style>
 </head>
 <body>
@@ -335,11 +360,9 @@ canvas { display:block; width:100%!important; height:100%!important; }
   <!-- LEFT: D-pad -->
   <div class="side-panel" id="left-panel">
     <div class="ctrl-label">MOVE</div>
-    <div class="dpad" id="dpad-left">
-      <div class="dpad-btn dpad-u" id="btn-up">▲</div>
-      <div class="dpad-btn dpad-l" id="btn-left">◀</div>
-      <div class="dpad-btn dpad-r" id="btn-right">▶</div>
-      <div class="dpad-btn dpad-d" id="btn-down">▼</div>
+    <div class="joystick" id="joystick">
+      <div class="joy-base"></div>
+      <div class="joy-stick" id="joy-stick"></div>
     </div>
   </div>
 
@@ -516,9 +539,9 @@ let CW = container.clientWidth;
 let CH = container.clientHeight;
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, ('ontouchstart' in window || navigator.maxTouchPoints > 0) ? 1.5 : 2));
 renderer.setSize(CW, CH);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !('ontouchstart' in window || navigator.maxTouchPoints > 0);
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setClearColor(0x0a0018);
 container.appendChild(renderer.domElement);
@@ -609,12 +632,11 @@ gltfScript.onload = () => {
     GLB_URL,
     (gltf) => {
       player = gltf.scene;
-      player.rotation.y = -Math.PI/2;
       // Auto-scale: fit into ~1 unit tall
       const box3 = new THREE.Box3().setFromObject(player);
       const size = box3.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
-      const scale  = 2.5 / maxDim;
+      const scale  = 3.0 / maxDim;
       player.scale.setScalar(scale);
       // Re-center pivot at feet
       const box2 = new THREE.Box3().setFromObject(player);
@@ -820,6 +842,41 @@ function doLevelTransition(nextIdx) {
 const keys = { w:false, a:false, s:false, d:false, space:false };
 const dpad = { up:false, down:false, left:false, right:false, jump:false };
 
+const joystickState={x:0,y:0};
+(function(){
+ const joy=document.getElementById('joystick');
+ const stick=document.getElementById('joy-stick');
+ if(!joy||!stick) return;
+ const maxR=45;
+ let active=false;
+
+ function update(clientX,clientY){
+   const r=joy.getBoundingClientRect();
+   const cx=r.left+r.width/2;
+   const cy=r.top+r.height/2;
+   let dx=clientX-cx, dy=clientY-cy;
+   const len=Math.hypot(dx,dy);
+   if(len>maxR){ dx=dx/len*maxR; dy=dy/len*maxR; }
+   stick.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+   joystickState.x=dx/maxR;
+   joystickState.y=dy/maxR;
+ }
+ function reset(){
+   active=False
+ }
+ joy.addEventListener('touchstart',e=>{active=true;update(e.touches[0].clientX,e.touches[0].clientY);},{passive:false});
+ joy.addEventListener('touchmove',e=>{if(active) update(e.touches[0].clientX,e.touches[0].clientY);},{passive:false});
+ const end=()=>{
+   active=false;
+   joystickState.x=0; joystickState.y=0;
+   stick.style.transform='translate(-50%,-50%)';
+ };
+ joy.addEventListener('touchend',end);
+ joy.addEventListener('touchcancel',end);
+})();
+
+
+
 document.addEventListener('keydown', e => {
   if (e.code==='KeyW'||e.code==='ArrowUp')    keys.w=true;
   if (e.code==='KeyA'||e.code==='ArrowLeft')  keys.a=true;
@@ -994,9 +1051,9 @@ function animate() {
   const rgt = (keys.d||dpad.right) ? 1 : 0;
 
   const mv = new THREE.Vector3(
-    (fwd - bwd),   // +X = forward toward next platform
+     ((keys.w?1:0)-(keys.s?1:0)) + (-joystickState.y),
     0,
-    (rgt - lft)    // +Z = strafe right, -Z = strafe left
+    ((keys.d?1:0)-(keys.a?1:0)) + joystickState.x
   );
   if (mv.length() > 1) mv.normalize();
 
